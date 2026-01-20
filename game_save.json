@@ -1,0 +1,239 @@
+import json
+import os
+from datetime import datetime
+
+class GameData:
+    """
+    Centralized game data storage system.
+    Tracks all player progress, settings, and statistics.
+    """
+    
+    def __init__(self):
+        self.save_file = "game_save.json"
+        self.stats_file = "game_statistics.json"
+        
+        # Default data structure
+        self.data = {
+            "player": {
+                "points": 0,
+                "total_points_earned": 0,
+                "highest_level": 1,
+                "deaths": 0,
+                "wins": 0
+            },
+            "inventory": {
+                "owned_items": [],  # List of item IDs
+                "used_items": []    # Track which items were used in current game
+            },
+            "abilities": {
+                "unlocked": ["Wolf Vein", "Dragon Heart", "Demon Eye", "Angels Halo", "John Snow"],
+                "selected": [],  # Current 2 abilities
+                "usage_count": {
+                    "Wolf Vein": 0,
+                    "Dragon Heart": 0,
+                    "Demon Eye": 0,
+                    "Angels Halo": 0,
+                    "John Snow": 0
+                }
+            },
+            "settings": {
+                "audio": {
+                    "music": 0.5,
+                    "sfx": 0.7
+                },
+                "keybinds": {
+                    "ability_1": 49,  # pygame.K_1
+                    "ability_2": 50,  # pygame.K_2
+                    "shop_1": 113,    # pygame.K_q
+                    "shop_2": 101     # pygame.K_e
+                }
+            },
+            "statistics": {
+                "total_playtime": 0,  # In seconds
+                "coins_collected": 0,
+                "ghosts_killed": 0,
+                "items_collected": 0,
+                "levels_completed": 0,
+                "last_played": None
+            },
+            "achievements": {
+                "first_win": False,
+                "speed_demon": False,  # Complete level under 2 min
+                "ghost_hunter": False,  # Kill 50 ghosts
+                "collector": False      # Collect 1000 coins
+            }
+        }
+        
+        # Load existing data
+        self.load()
+    
+    def load(self):
+        """Load saved game data"""
+        if os.path.exists(self.save_file):
+            try:
+                with open(self.save_file, 'r') as f:
+                    loaded_data = json.load(f)
+                    # Merge with defaults to ensure all keys exist
+                    self._merge_data(self.data, loaded_data)
+                print(f"✓ Game data loaded: {self.data['player']['points']} points")
+            except Exception as e:
+                print(f"Error loading save: {e}")
+        else:
+            print("No save file found. Starting fresh.")
+    
+    def save(self):
+        """Save game data to file"""
+        try:
+            self.data["statistics"]["last_played"] = datetime.now().isoformat()
+            with open(self.save_file, 'w') as f:
+                json.dump(self.data, f, indent=2)
+            print("✓ Game data saved successfully")
+        except Exception as e:
+            print(f"Error saving game: {e}")
+    
+    def _merge_data(self, default, loaded):
+        """Recursively merge loaded data with defaults"""
+        for key, value in loaded.items():
+            if key in default:
+                if isinstance(value, dict) and isinstance(default[key], dict):
+                    self._merge_data(default[key], value)
+                else:
+                    default[key] = value
+    
+    # --- PLAYER DATA ---
+    def add_points(self, amount):
+        self.data["player"]["points"] += amount
+        self.data["player"]["total_points_earned"] += amount
+        self.save()
+    
+    def spend_points(self, amount):
+        if self.data["player"]["points"] >= amount:
+            self.data["player"]["points"] -= amount
+            self.save()
+            return True
+        return False
+    
+    def get_points(self):
+        return self.data["player"]["points"]
+    
+    def record_death(self):
+        self.data["player"]["deaths"] += 1
+        self.save()
+    
+    def record_win(self):
+        self.data["player"]["wins"] += 1
+        self.data["achievements"]["first_win"] = True
+        self.save()
+    
+    def update_highest_level(self, level):
+        if level > self.data["player"]["highest_level"]:
+            self.data["player"]["highest_level"] = level
+            self.save()
+    
+    # --- INVENTORY ---
+    def buy_item(self, item_id):
+        if item_id not in self.data["inventory"]["owned_items"]:
+            self.data["inventory"]["owned_items"].append(item_id)
+            self.save()
+    
+    def use_item(self, item_id):
+        if item_id not in self.data["inventory"]["used_items"]:
+            self.data["inventory"]["used_items"].append(item_id)
+            # Don't save here - save at end of level
+    
+    def reset_used_items(self):
+        """Call this when starting a new game"""
+        self.data["inventory"]["used_items"] = []
+    
+    def get_inventory(self):
+        return self.data["inventory"]["owned_items"]
+    
+    def get_unused_items(self):
+        """Returns items that haven't been used this game"""
+        owned = set(self.data["inventory"]["owned_items"])
+        used = set(self.data["inventory"]["used_items"])
+        return list(owned - used)
+    
+    # --- ABILITIES ---
+    def set_selected_abilities(self, abilities):
+        self.data["abilities"]["selected"] = abilities
+        self.save()
+    
+    def get_selected_abilities(self):
+        return self.data["abilities"]["selected"]
+    
+    def record_ability_use(self, ability_name):
+        if ability_name in self.data["abilities"]["usage_count"]:
+            self.data["abilities"]["usage_count"][ability_name] += 1
+            # Save at end of session, not every use
+    
+    # --- SETTINGS ---
+    def update_audio(self, music_vol, sfx_vol):
+        self.data["settings"]["audio"]["music"] = music_vol
+        self.data["settings"]["audio"]["sfx"] = sfx_vol
+        self.save()
+    
+    def update_keybind(self, action, key_code):
+        self.data["settings"]["keybinds"][action] = key_code
+        self.save()
+    
+    def get_settings(self):
+        return self.data["settings"]
+    
+    # --- STATISTICS ---
+    def add_playtime(self, seconds):
+        self.data["statistics"]["total_playtime"] += seconds
+    
+    def add_coins_collected(self, amount):
+        self.data["statistics"]["coins_collected"] += amount
+        if self.data["statistics"]["coins_collected"] >= 1000:
+            self.data["achievements"]["collector"] = True
+    
+    def add_ghost_kill(self):
+        self.data["statistics"]["ghosts_killed"] += 1
+        if self.data["statistics"]["ghosts_killed"] >= 50:
+            self.data["achievements"]["ghost_hunter"] = True
+    
+    def add_item_collected(self):
+        self.data["statistics"]["items_collected"] += 1
+    
+    def complete_level(self):
+        self.data["statistics"]["levels_completed"] += 1
+    
+    # --- UTILITY ---
+    def get_full_report(self):
+        """Returns formatted string of all game data"""
+        report = []
+        report.append("="*50)
+        report.append("GAME DATA REPORT")
+        report.append("="*50)
+        report.append(f"Points: {self.data['player']['points']}")
+        report.append(f"Total Earned: {self.data['player']['total_points_earned']}")
+        report.append(f"Highest Level: {self.data['player']['highest_level']}")
+        report.append(f"Deaths: {self.data['player']['deaths']}")
+        report.append(f"Wins: {self.data['player']['wins']}")
+        report.append(f"\nInventory: {self.data['inventory']['owned_items']}")
+        report.append(f"Selected Abilities: {self.data['abilities']['selected']}")
+        report.append(f"\nCoins Collected: {self.data['statistics']['coins_collected']}")
+        report.append(f"Ghosts Killed: {self.data['statistics']['ghosts_killed']}")
+        report.append(f"Levels Completed: {self.data['statistics']['levels_completed']}")
+        report.append("="*50)
+        return "\n".join(report)
+    
+    def reset_progress(self):
+        """Completely reset all game data"""
+        if os.path.exists(self.save_file):
+            os.remove(self.save_file)
+        self.__init__()
+        print("All game data has been reset!")
+
+
+# Global instance
+_game_data = None
+
+def get_game_data():
+    """Get the singleton GameData instance"""
+    global _game_data
+    if _game_data is None:
+        _game_data = GameData()
+    return _game_data

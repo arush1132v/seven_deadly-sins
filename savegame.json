@@ -1,0 +1,13 @@
+import json
+
+def save_game(points, inventory):
+    data = {"points": points, "inventory": inventory}
+    with open("save_data.json", "w") as f:
+        json.dump(data, f)
+
+def load_game():
+    try:
+        with open("save_data.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"points": 0, "inventory": []}

@@ -1,5 +1,6 @@
 import pygame
 import sys
+import os
 from abilities import AbilityManager
 
 # --- CONFIGURATION ---
@@ -23,6 +24,21 @@ class AbilitySelectScreen:
         self.font_title = pygame.font.SysFont("arial", 40, bold=True)
         self.font_card = pygame.font.SysFont("arial", 20, bold=True)
         self.font_desc = pygame.font.SysFont("arial", 16)
+        
+        # --- NEW: LOAD ABILITY ICONS ---
+        self.icons = {}
+        for name in self.manager.data.keys():
+            # Matches filenames like 'wolf_vein.png' in an 'assets' folder
+            image_filename = name.lower().replace(" ", "_") + ".png"
+            path = os.path.join("assets", image_filename)
+            try:
+                img = pygame.image.load(path).convert_alpha()
+                self.icons[name] = pygame.transform.scale(img, (60, 60))
+            except FileNotFoundError:
+                # Fallback: Draw a colored square if the image is missing
+                fallback = pygame.Surface((60, 60))
+                fallback.fill(self.manager.data[name]["color"])
+                self.icons[name] = fallback
         
         # Create Rects for the 5 cards
         self.ability_cards = []
@@ -61,21 +77,20 @@ class AbilitySelectScreen:
                 if event.button == 1:
                     mouse_click = True
 
-        # Check Card Clicks
         if mouse_click:
-            # 1. Check Cards
+            # Check Card Clicks
             for card in self.ability_cards:
                 if card["rect"].collidepoint(mouse_pos):
                     name = card["name"]
                     if name in self.selected_abilities:
-                        self.selected_abilities.remove(name) # Deselect
+                        self.selected_abilities.remove(name)
                     elif len(self.selected_abilities) < 2:
-                        self.selected_abilities.append(name) # Select
+                        self.selected_abilities.append(name)
             
-            # 2. Check Confirm Button
+            # Check Confirm Button
             if len(self.selected_abilities) == 2:
                 if self.confirm_rect.collidepoint(mouse_pos):
-                    return "CONFIRM" # Signal to main loop to proceed
+                    return "CONFIRM"
         
         return None
 
@@ -94,8 +109,6 @@ class AbilitySelectScreen:
             is_selected = name in self.selected_abilities
             
             # Card Background
-            color = data["color"]
-            # Dim the color if not selected and we already have 2 picked
             if len(self.selected_abilities) == 2 and not is_selected:
                 draw_color = (50, 50, 50)
             else:
@@ -105,33 +118,34 @@ class AbilitySelectScreen:
             
             # Border (Highlight if selected)
             if is_selected:
-                pygame.draw.rect(self.screen, color, rect, 4, border_radius=10)
+                pygame.draw.rect(self.screen, data["color"], rect, 4, border_radius=10)
             else:
                 pygame.draw.rect(self.screen, GRAY, rect, 2, border_radius=10)
 
-            # Icon Placeholder (Using the color circle from your manager)
-            # You can replace this with your actual Icon images later
+            # --- UPDATED: Draw Image instead of Circle ---
             center_x = rect.x + rect.width // 2
-            pygame.draw.circle(self.screen, data["color"], (center_x, rect.y + 40), 20)
+            icon_image = self.icons.get(name)
+            if icon_image:
+                image_rect = icon_image.get_rect(center=(center_x, rect.y + 40))
+                self.screen.blit(icon_image, image_rect)
 
             # Text: Name
             name_surf = self.font_card.render(name, True, WHITE)
             self.screen.blit(name_surf, (center_x - name_surf.get_width()//2, rect.y + 70))
 
-            # Text: Description (Simple wrap logic)
+            # Text: Description (Wrapped)
             desc_words = data["desc"].split(" ")
             line = ""
             y_offset = 100
             for word in desc_words:
                 test_line = line + word + " "
-                if self.font_desc.size(test_line)[0] < rect.width - 10:
+                if self.font_desc.size(test_line)[0] < rect.width - 20:
                     line = test_line
                 else:
                     text_surf = self.font_desc.render(line, True, (200, 200, 200))
                     self.screen.blit(text_surf, (rect.x + 10, rect.y + y_offset))
                     line = word + " "
                     y_offset += 20
-            # Draw last line
             text_surf = self.font_desc.render(line, True, (200, 200, 200))
             self.screen.blit(text_surf, (rect.x + 10, rect.y + y_offset))
 
@@ -149,12 +163,11 @@ class AbilitySelectScreen:
                                     self.confirm_rect.centery - btn_text.get_height()//2))
 
     def run(self):
-        """Blocking loop that waits for selection"""
-        waiting = True
-        while waiting:
+        """Blocking loop that returns the selected abilities to main.py"""
+        while True:
             result = self.handle_input()
             if result == "CONFIRM":
-                return self.selected_abilities
+                return self.selected_abilities # Returns ['Ability1', 'Ability2'] to main.py
             
             self.draw()
             pygame.display.flip()

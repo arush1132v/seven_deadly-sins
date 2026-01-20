@@ -6,22 +6,26 @@ SCREEN_HEIGHT = 600
 WHITE = (255, 255, 255)
 GRAY = (100, 100, 100)
 ACTIVE_COLOR = (50, 205, 50) # Green
-RED = (255, 50, 50)
+RED = (255, 50, 50) # Red for rebinding
 
 class SettingsScreen:
-    def __init__(self, screen, config):
+    def __init__(self, screen, config, audio_manager=None): 
         self.screen = screen
-        self.config = config # Reference to the main config dictionary
+        self.config = config 
+        self.audio_manager = audio_manager
+        
+        # Fonts
         self.font_title = pygame.font.SysFont("arial", 40, bold=True)
         self.font_text = pygame.font.SysFont("arial", 24)
+        self.font_small = pygame.font.SysFont("arial", 16)
         
-        self.rebinding_action = None # Which action are we currently rebinding?
+        self.rebinding_action = None 
         
-        # Define clickable areas (Rects)
+        # --- DEFINE BUTTONS ---
         self.buttons = {
             "back": pygame.Rect(SCREEN_WIDTH//2 - 100, 520, 200, 50),
             
-            # Audio Toggles
+            # Audio Sliders
             "music_vol": pygame.Rect(450, 150, 200, 30),
             "sfx_vol":   pygame.Rect(450, 200, 200, 30),
             
@@ -29,106 +33,140 @@ class SettingsScreen:
             "ability_1": pygame.Rect(450, 300, 150, 35),
             "ability_2": pygame.Rect(450, 350, 150, 35),
             "shop_1":    pygame.Rect(450, 400, 150, 35),
-            "shop_2":    pygame.Rect(450, 450, 150, 35),
+            "shop_2":    pygame.Rect(450, 450, 150, 35)
         }
 
     def get_key_name(self, key_code):
-        """Converts pygame key integer to string name"""
         return pygame.key.name(key_code).upper()
 
     def handle_input(self):
+        mouse_pos = pygame.mouse.get_pos()
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "QUIT"
-            
-            # 1. KEY REBINDING LOGIC
-            if self.rebinding_action:
-                if event.type == pygame.KEYDOWN:
-                    # Assign new key
-                    self.config["keybinds"][self.rebinding_action] = event.key
-                    self.rebinding_action = None # Stop listening
-                return None
-
-            # 2. STANDARD CLICKS
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                mp = pygame.mouse.get_pos()
                 
-                # Check Back Button
-                if self.buttons["back"].collidepoint(mp):
-                    return "MENU" # Go back to menu
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                # 1. Back Button
+                if self.buttons["back"].collidepoint(mouse_pos):
+                    return "MENU"
                 
-                # Check Volume Clicks (Cycle 0 -> 50 -> 100 -> 0)
-                if self.buttons["music_vol"].collidepoint(mp):
-                    self.config["audio"]["music"] = (self.config["audio"]["music"] + 0.5) 
-                    if self.config["audio"]["music"] > 1.0: self.config["audio"]["music"] = 0.0
-                    # Apply real mixer volume here if you had music loaded
-                    # pygame.mixer.music.set_volume(self.config["audio"]["music"])
+                # 2. Audio Sliders
+                if self.buttons["music_vol"].collidepoint(mouse_pos):
+                    rel_x = mouse_pos[0] - self.buttons["music_vol"].x
+                    new_vol = rel_x / self.buttons["music_vol"].width
+                    self.config["audio"]["music"] = max(0, min(1, new_vol))
+                    if self.audio_manager:
+                        self.audio_manager.set_music_volume(self.config["audio"]["music"])
+                    
+                if self.buttons["sfx_vol"].collidepoint(mouse_pos):
+                    rel_x = mouse_pos[0] - self.buttons["sfx_vol"].x
+                    new_vol = rel_x / self.buttons["sfx_vol"].width
+                    self.config["audio"]["sfx"] = max(0, min(1, new_vol))
+                    if self.audio_manager:
+                        self.audio_manager.set_sfx_volume(self.config["audio"]["sfx"])
 
-                if self.buttons["sfx_vol"].collidepoint(mp):
-                    self.config["audio"]["sfx"] = (self.config["audio"]["sfx"] + 0.5)
-                    if self.config["audio"]["sfx"] > 1.0: self.config["audio"]["sfx"] = 0.0
-
-                # Check Keybind Buttons
+                # 3. Keybind Rebinding
                 for action in ["ability_1", "ability_2", "shop_1", "shop_2"]:
-                    if self.buttons[action].collidepoint(mp):
-                        self.rebinding_action = action # Start waiting for key
+                    if self.buttons[action].collidepoint(mouse_pos):
+                        self.rebinding_action = action
+
+# [INSERT THIS NEW BLOCK HERE]
+            elif event.type == pygame.MOUSEMOTION:
+                if pygame.mouse.get_pressed()[0]: # If holding down click
+                    # 1. Dragging Music Slider
+                    if self.buttons["music_vol"].collidepoint(mouse_pos):
+                        rel_x = mouse_pos[0] - self.buttons["music_vol"].x
+                        new_vol = rel_x / self.buttons["music_vol"].width
+                        self.config["audio"]["music"] = max(0, min(1, new_vol))
+                        if self.audio_manager:
+                            self.audio_manager.set_music_volume(self.config["audio"]["music"])
+                    
+                    # 2. Dragging SFX Slider
+                    if self.buttons["sfx_vol"].collidepoint(mouse_pos):
+                        rel_x = mouse_pos[0] - self.buttons["sfx_vol"].x
+                        new_vol = rel_x / self.buttons["sfx_vol"].width
+                        self.config["audio"]["sfx"] = max(0, min(1, new_vol))
+                        if self.audio_manager:
+                            self.audio_manager.set_sfx_volume(self.config["audio"]["sfx"])
+
+            # 4. Handle Key Press for Rebinding
+            if event.type == pygame.KEYDOWN:
+                if self.rebinding_action:
+                    self.config["keybinds"][self.rebinding_action] = event.key
+                    self.rebinding_action = None
         
         return None
 
     def draw(self):
-        self.screen.fill((40, 40, 40))
+        self.screen.fill((20, 20, 20)) # Dark background
         
-        # --- TITLE ---
-        title = self.font_title.render("SETTINGS", True, WHITE)
-        self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 50))
+        # Title
+        title_surf = self.font_title.render("SETTINGS", True, WHITE)
+        self.screen.blit(title_surf, (SCREEN_WIDTH//2 - title_surf.get_width()//2, 50))
 
         # --- AUDIO SECTION ---
-        # Labels
-        self.screen.blit(self.font_text.render("Music Volume:", True, WHITE), (200, 150))
-        self.screen.blit(self.font_text.render("Game Sound:", True, WHITE), (200, 200))
+        # Draw Music Slider
+        self.draw_slider(self.screen, self.buttons["music_vol"], 
+                         self.config["audio"]["music"], "Music Volume")
         
-        # Values (Clickable)
-        m_vol = int(self.config["audio"]["music"] * 100)
-        s_vol = int(self.config["audio"]["sfx"] * 100)
-        
-        self.draw_button(self.buttons["music_vol"], f"{m_vol}%", GRAY)
-        self.draw_button(self.buttons["sfx_vol"], f"{s_vol}%", GRAY)
+        # Draw SFX Slider
+        self.draw_slider(self.screen, self.buttons["sfx_vol"], 
+                         self.config["audio"]["sfx"], "SFX Volume")
 
         # --- CONTROLS SECTION ---
-        # Labels
-        self.screen.blit(self.font_text.render("Ability 1 Key:", True, WHITE), (200, 300))
-        self.screen.blit(self.font_text.render("Ability 2 Key:", True, WHITE), (200, 350))
-        self.screen.blit(self.font_text.render("Shop Item 1 Key:", True, WHITE), (200, 400))
-        self.screen.blit(self.font_text.render("Shop Item 2 Key:", True, WHITE), (200, 450))
-
-        # Key Buttons
-        for action in ["ability_1", "ability_2", "shop_1", "shop_2"]:
-            rect = self.buttons[action]
+        y_label = 300
+        labels = ["Ability 1 Key:", "Ability 2 Key:", "Shop Item 1 Key:", "Shop Item 2 Key:"]
+        actions = ["ability_1", "ability_2", "shop_1", "shop_2"]
+        
+        for i in range(len(labels)):
+            # Draw Label
+            label_surf = self.font_text.render(labels[i], True, WHITE)
+            self.screen.blit(label_surf, (200, y_label + (i*50)))
             
-            # If we are currently rebinding this specific key, make it Red and say "PRESS KEY"
-            if self.rebinding_action == action:
-                self.draw_button(rect, "PRESS KEY...", RED)
+            # Draw Button
+            rect = self.buttons[actions[i]]
+            if self.rebinding_action == actions[i]:
+                self.draw_button(self.screen, rect, "PRESS KEY...", RED)
             else:
-                key_name = self.get_key_name(self.config["keybinds"][action])
-                self.draw_button(rect, key_name, ACTIVE_COLOR)
+                key_name = self.get_key_name(self.config["keybinds"][actions[i]])
+                self.draw_button(self.screen, rect, key_name, GRAY)
 
-        # --- BACK BUTTON ---
-        self.draw_button(self.buttons["back"], "BACK TO MENU", WHITE, text_color=(0,0,0))
+        # Back Button
+        self.draw_button(self.screen, self.buttons["back"], "BACK TO MENU", WHITE, text_color=(0,0,0))
         
         pygame.display.flip()
 
-    def draw_button(self, rect, text, bg_color, text_color=WHITE):
-        pygame.draw.rect(self.screen, bg_color, rect, border_radius=8)
-        pygame.draw.rect(self.screen, WHITE, rect, 2, border_radius=8) # Border
+    def draw_slider(self, surface, rect, value, label_text):
+        # Draw Label
+        label = self.font_text.render(label_text, True, WHITE)
+        surface.blit(label, (rect.x - 220, rect.y))
+        
+        # Draw Bar Background
+        pygame.draw.rect(surface, GRAY, rect, border_radius=5)
+        
+        # Draw Fill (Green part)
+        fill_width = rect.width * value
+        fill_rect = pygame.Rect(rect.x, rect.y, fill_width, rect.height)
+        pygame.draw.rect(surface, ACTIVE_COLOR, fill_rect, border_radius=5)
+
+    def draw_button(self, surface, rect, text, bg_color, text_color=WHITE):
+        pygame.draw.rect(surface, bg_color, rect, border_radius=8)
+        pygame.draw.rect(surface, WHITE, rect, 2, border_radius=8) # Border
         txt_surf = self.font_text.render(text, True, text_color)
-        self.screen.blit(txt_surf, (rect.centerx - txt_surf.get_width()//2, rect.centery - txt_surf.get_height()//2))
+        surface.blit(txt_surf, (rect.centerx - txt_surf.get_width()//2, rect.centery - txt_surf.get_height()//2))
 
     def run(self):
-        """Blocking Loop for settings menu"""
-        running = True
-        while running:
+        """Main loop for the settings screen"""
+        clock = pygame.time.Clock()
+        while True:
             result = self.handle_input()
-            if result == "QUIT": return "QUIT"
-            if result == "MENU": return "MENU"
-            
+            if result == "MENU":
+                return "MENU"
+            if result == "QUIT":
+                pygame.quit()
+                import sys
+                sys.exit()
+                
             self.draw()
+            clock.tick(60)

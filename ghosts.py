@@ -22,47 +22,100 @@ def load_ghost_img(name, color):
 # PARENT CLASS
 # ==========================================
 class BaseGhost(pygame.sprite.Sprite):
-    # Inside BaseGhost class in ghosts.py
-
     def __init__(self, x, y, name, color, img_file):
         super().__init__()
-        # ... existing init code ...
+        self.name = name
+        self.color = color  # Store color for name label
+        self.image = load_ghost_img(img_file, color)
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.pos = [float(x), float(y)]
+        self.speed = BASE_SPEED
+        self.state = "CHASE" 
         
-        # NEW: Status Effect Timers
-        self.fear_timer = 0      # Dragon Heart effect
-        self.confusion_timer = 0 # Demon Eye effect
+        # --- STATUS EFFECTS ---
+        self.sleep_timer = 0          # Stunned/Asleep (Envy/Wrath effect)
+        self.speed_penalty_timer = 0  # Slowed down (Sloth effect)
+        self.fear_timer = 0           # Dragon Heart effect (50% speed)
+        self.confusion_timer = 0      # Demon Eye effect (attack other ghosts)
+        
+        # --- NAME LABEL ---
+        self.font = pygame.font.SysFont("arial", 12, bold=True)
+        self.name_surface = self.font.render(self.name, True, (255, 255, 255))
+        self.name_bg = pygame.Surface((self.name_surface.get_width() + 6, self.name_surface.get_height() + 4), pygame.SRCALPHA)
+        self.name_bg.fill((0, 0, 0, 180))  # Semi-transparent black background
+        
+        # Status indicator font
+        self.status_font = pygame.font.SysFont("arial", 10, bold=True)
 
     def apply_status(self, status_type, duration):
+        """Apply a status effect to this ghost"""
         if status_type == "fear":
             self.fear_timer = duration
+            print(f"  {self.name} is now FEARED for {duration/60:.1f}s")
         elif status_type == "confusion":
             self.confusion_timer = duration
+            print(f"  {self.name} is now CONFUSED for {duration/60:.1f}s")
 
     def update_status_effects(self):
-        """Decrements timers and returns current state modifiers."""
+        """
+        Decrements timers and returns current state modifiers.
+        Returns: dict with 'speed' multiplier and 'target_override'
+        """
         modifiers = {"speed": 1.0, "target_override": None}
         
-        # [cite_start]Handle Fear (50% Stats Decrease) [cite: 17]
+        # Handle Fear (50% Speed Decrease)
         if self.fear_timer > 0:
             self.fear_timer -= 1
             modifiers["speed"] *= 0.5 
             
-        # [cite_start]Handle Confusion (Target other ghosts) [cite: 17]
+        # Handle Confusion (Target other ghosts)
         if self.confusion_timer > 0:
             self.confusion_timer -= 1
             modifiers["target_override"] = "GHOSTS"
             
         return modifiers
 
-    # UPDATE your existing move_towards or update method to use these modifiers:
-    def update_ai_logic(self, player, all_ghosts):
-        """Call this in your specific ghost update methods."""
+    def get_distance(self, target):
+        return math.hypot(target.rect.centerx - self.rect.centerx, 
+                          target.rect.centery - self.rect.centery)
+
+    def move_towards(self, target_rect, speed_mod=1.0):
+        """Move towards a target with optional speed modifier"""
+        # Calculate Direction
+        dx = target_rect.centerx - self.rect.centerx
+        dy = target_rect.centery - self.rect.centery
+        dist = math.hypot(dx, dy)
         
+        if dist != 0:
+            dx, dy = dx / dist, dy / dist 
+            
+            # Calculate Speed
+            current_speed = self.speed * speed_mod
+            
+            # Apply Sloth's Speed Curse (0.25x speed if cursed)
+            if self.speed_penalty_timer > 0:
+                current_speed *= 0.25
+                self.speed_penalty_timer -= 1
+            
+            # Move
+            self.pos[0] += dx * current_speed
+            self.pos[1] += dy * current_speed
+            self.rect.x = int(self.pos[0])
+            self.rect.y = int(self.pos[1])
+
+    def update_with_ai(self, player, all_ghosts):
+        """
+        Standard AI update that handles status effects.
+        Call this from child class update() methods.
+        """
+        if not self.check_status(): 
+            return False  # Ghost is stunned
+        
+        # Get status effect modifiers
         mods = self.update_status_effects()
-        
         target_rect = player.rect
         
-        # CONFUSION LOGIC: Find a ghost to attack instead of player
+        # CONFUSION LOGIC: Target other ghosts instead of player
         if mods["target_override"] == "GHOSTS":
             nearest_victim = None
             min_dist = 9999
@@ -76,50 +129,12 @@ class BaseGhost(pygame.sprite.Sprite):
             if nearest_victim:
                 target_rect = nearest_victim.rect
             else:
-                # [cite_start]If no other ghosts exist, just stop moving (Stun) [cite: 17]
-                return 
-
-        # Execute Movement
+                # No other ghosts - just stop moving
+                return False
+        
+        # Execute Movement with fear modifier
         self.move_towards(target_rect, speed_mod=mods["speed"])
-    def __init__(self, x, y, name, color, img_file):
-        super().__init__()
-        self.name = name
-        self.image = load_ghost_img(img_file, color)
-        self.rect = self.image.get_rect(topleft=(x, y))
-        self.pos = [float(x), float(y)]
-        self.speed = BASE_SPEED
-        self.state = "CHASE" 
-        
-        # --- STATUS EFFECTS ---
-        self.sleep_timer = 0          # Stunned/Asleep (Envy/Wrath effect)
-        self.speed_penalty_timer = 0  # Slowed down (Sloth effect)
-        
-    def get_distance(self, target):
-        return math.hypot(target.rect.centerx - self.rect.centerx, 
-                          target.rect.centery - self.rect.centery)
-
-    def move_towards(self, target_rect, speed_mod=1.0):
-        # 1. Calculate Direction
-        dx = target_rect.centerx - self.rect.centerx
-        dy = target_rect.centery - self.rect.centery
-        dist = math.hypot(dx, dy)
-        
-        if dist != 0:
-            dx, dy = dx / dist, dy / dist 
-            
-            # 2. Calculate Speed
-            current_speed = self.speed * speed_mod
-            
-            # Apply Sloth's Speed Curse (0.25x speed if cursed)
-            if self.speed_penalty_timer > 0:
-                current_speed *= 0.25
-                self.speed_penalty_timer -= 1
-            
-            # 3. Move
-            self.pos[0] += dx * current_speed
-            self.pos[1] += dy * current_speed
-            self.rect.x = int(self.pos[0])
-            self.rect.y = int(self.pos[1])
+        return True
 
     def check_status(self):
         """Checks if ghost is asleep/stunned. Returns True if acting normally."""
@@ -130,6 +145,52 @@ class BaseGhost(pygame.sprite.Sprite):
 
     def handle_catch(self):
         return "KILL"
+
+    def draw_name(self, surface, camera):
+        """Draw ghost name above their head"""
+        # Calculate screen position
+        screen_x = self.rect.centerx + camera.camera.x
+        screen_y = self.rect.top + camera.camera.y - 18
+        
+        # Draw background
+        bg_rect = self.name_bg.get_rect(center=(screen_x, screen_y))
+        surface.blit(self.name_bg, bg_rect)
+        
+        # Draw name text
+        text_rect = self.name_surface.get_rect(center=(screen_x, screen_y))
+        surface.blit(self.name_surface, text_rect)
+        
+        # Draw status indicators
+        self.draw_status_icons(surface, camera)
+    
+    def draw_status_icons(self, surface, camera):
+        """Draw icons for active status effects"""
+        screen_x = self.rect.centerx + camera.camera.x
+        screen_y = self.rect.bottom + camera.camera.y + 5
+        offset = 0
+        
+        # Fear indicator (red skull)
+        if self.fear_timer > 0:
+            fear_text = self.status_font.render("😱", True, (255, 0, 0))
+            surface.blit(fear_text, (screen_x - 15 + offset, screen_y))
+            offset += 15
+        
+        # Confusion indicator (purple swirl)
+        if self.confusion_timer > 0:
+            conf_text = self.status_font.render("😵", True, (148, 0, 211))
+            surface.blit(conf_text, (screen_x - 15 + offset, screen_y))
+            offset += 15
+        
+        # Sleep indicator (zzz)
+        if self.sleep_timer > 0:
+            sleep_text = self.status_font.render("💤", True, (100, 100, 255))
+            surface.blit(sleep_text, (screen_x - 15 + offset, screen_y))
+            offset += 15
+        
+        # Slow indicator (snowflake)
+        if self.speed_penalty_timer > 0:
+            slow_text = self.status_font.render("❄️", True, (0, 255, 255))
+            surface.blit(slow_text, (screen_x - 15 + offset, screen_y))
 
     def kill(self):
         super().kill()
@@ -145,13 +206,17 @@ class PrideGhost(BaseGhost):
 
     def update(self, player, all_ghosts):
         if not self.check_status(): return
-        # Pride is immune to Sloth's speed curse, so we manually reset it if applied
-        self.speed_penalty_timer = 0 
-        self.move_towards(player.rect)
+        
+        # Pride is immune to Sloth's speed curse
+        self.speed_penalty_timer = 0
+        
+        # Use AI with status effects
+        self.update_with_ai(player, all_ghosts)
 
     def handle_catch(self):
         if self.mercy_lives > 0:
             self.mercy_lives -= 1
+            print(f"Pride showed mercy! {self.mercy_lives} mercies left")
             return "SPARE"
         else:
             return "KILL"
@@ -162,6 +227,8 @@ class PrideGhost(BaseGhost):
 # ==========================================
 # 2. GREED (The Merchant & Assassin)
 # ==========================================
+# Replace the GreedGhost class in ghosts.py with this updated version:
+
 class GreedGhost(BaseGhost):
     def __init__(self, x, y):
         super().__init__(x, y, "Greed", (255, 215, 0), "ghost_greed.png")
@@ -170,10 +237,34 @@ class GreedGhost(BaseGhost):
         self.cost_kill_service = 200
         self.hunter_mode = False
         self.hunter_timer = 0
+        self.target_ghost = None  # Specific ghost to hunt
         self.cooldown_timer = 0
+        self.trade_active = False
+        self.trade_proximity = 80
+        self.passive_timer = 0  # Timer for being passive after trade
 
     def update(self, player, all_ghosts):
-        if not self.check_status(): return 
+        if not self.check_status(): 
+            return 
+
+        # If in passive mode (after trade), don't attack player
+        if self.passive_timer > 0:
+            self.passive_timer -= 1
+            # Just wander around slowly, don't chase player
+            if self.passive_timer % 60 == 0:  # Change direction every second
+                import random
+                self.pos[0] += random.choice([-2, 0, 2])
+                self.pos[1] += random.choice([-2, 0, 2])
+                self.rect.x = int(self.pos[0])
+                self.rect.y = int(self.pos[1])
+            return
+
+        # Check if close enough for trade
+        dist_to_player = self.get_distance(player)
+        if dist_to_player < self.trade_proximity and self.cooldown_timer == 0:
+            self.trade_active = True
+        else:
+            self.trade_active = False
 
         if self.cooldown_timer > 0:
             self.cooldown_timer -= 1
@@ -182,36 +273,59 @@ class GreedGhost(BaseGhost):
         if self.hunter_mode:
             self.hunter_timer -= 1
             if self.hunter_timer <= 0:
-                self.hunter_mode = False 
+                self.hunter_mode = False
+                self.target_ghost = None
+                print("Greed's assassination contract expired!")
             else:
-                target_ghost = None
-                min_dist = 9999
-                for ghost in all_ghosts:
-                    if ghost != self and ghost.name != "Pride":
-                        d = self.get_distance(ghost)
-                        if d < min_dist:
-                            min_dist = d
-                            target_ghost = ghost
-                
-                if target_ghost:
-                    self.move_towards(target_ghost.rect)
+                # Check if target still exists
+                if self.target_ghost and self.target_ghost in all_ghosts:
+                    # Move toward target
+                    self.move_towards(self.target_ghost.rect, speed_mod=1.5)  # 50% faster when hunting
+                    
+                    # Kill target on contact
+                    if self.rect.colliderect(self.target_ghost.rect):
+                        self.target_ghost.kill()
+                        print(f"💀 Greed assassinated {self.target_ghost.name}!")
+                        self.hunter_mode = False
+                        self.target_ghost = None
+                        self.cooldown_timer = 180  # 3 second cooldown after successful kill
+                        return
                 else:
-                    self.move_towards(player.rect) 
+                    # Target was killed by something else or doesn't exist
+                    print("Target lost! Greed is searching...")
+                    self.hunter_mode = False
+                    self.target_ghost = None
+                    self.move_towards(player.rect)
                 return
 
-        self.move_towards(player.rect)
+        # Normal behavior - use AI with status effects
+        self.update_with_ai(player, all_ghosts)
 
     def handle_catch(self):
+        # Don't kill player if in passive mode
+        if self.passive_timer > 0:
+            return "SPARE"
         return "GREED_EVENT"
 
     def pay_for_mercy(self):
+        """Player pays to make Greed leave them alone temporarily"""
         self.cost_spare += 50 
         self.cooldown_timer = 180 
+        self.trade_active = False
+        self.passive_timer = 600  # 10 seconds of not hunting player
+        print(f"Greed will leave you alone for 10 seconds!")
+        print(f"Greed's next mercy price: {self.cost_spare} coins")
 
-    def pay_for_service(self):
+    def pay_for_service(self, target_ghost):
+        """Player pays to make Greed hunt a specific ghost"""
         self.hunter_mode = True
-        self.hunter_timer = 600 
-        self.cooldown_timer = 60 
+        self.target_ghost = target_ghost
+        self.hunter_timer = 600  # 10 seconds to complete the kill
+        self.cooldown_timer = 60  # 1 second before can trade again
+        self.trade_active = False
+        self.passive_timer = 600  # 10 seconds of not hunting player
+        print(f"🎯 Greed is now hunting {target_ghost.name}!")
+        print(f"Greed will leave you alone for 10 seconds!")
 
 # ==========================================
 # 3. LUST (Relentless Pursuer)
@@ -222,8 +336,8 @@ class LustGhost(BaseGhost):
         self.speed = BASE_SPEED * 0.75 
 
     def update(self, player, all_ghosts):
-        if not self.check_status(): return
-        self.move_towards(player.rect)
+        # Use AI with status effects
+        self.update_with_ai(player, all_ghosts)
 
 # ==========================================
 # 4. ENVY (The Betrayer)
@@ -253,10 +367,13 @@ class EnvyGhost(BaseGhost):
                             roll = random.random()
                             if roll < 0.10:
                                 ghost.kill()
+                                print(f"Envy killed {ghost.name}!")
                             elif roll < 0.35: 
-                                ghost.sleep_timer = 600 
+                                ghost.sleep_timer = 600
+                                print(f"Envy put {ghost.name} to sleep!")
 
-        self.move_towards(player.rect)
+        # Use AI with status effects
+        self.update_with_ai(player, all_ghosts)
 
 # ==========================================
 # 5. GLUTTONY (Hungry)
@@ -266,8 +383,8 @@ class GluttonyGhost(BaseGhost):
         super().__init__(x, y, "Gluttony", (255, 140, 0), "ghost_gluttony.png")
 
     def update(self, player, all_ghosts):
-        if not self.check_status(): return
-        self.move_towards(player.rect)
+        # Use AI with status effects
+        self.update_with_ai(player, all_ghosts)
 
 # ==========================================
 # 6. WRATH (The Berserker)
@@ -292,8 +409,10 @@ class WrathGhost(BaseGhost):
             for ghost in all_ghosts:
                 if ghost != self and ghost.name != "Pride":
                     if self.rect.colliderect(ghost.rect):
-                        ghost.sleep_timer = 600 
+                        ghost.sleep_timer = 600
+                        print(f"Wrath knocked out {ghost.name}!")
 
+        # Random erratic movement
         if random.random() < 0.25: 
             self.pos[0] += random.choice([-5, 5])
             self.pos[1] += random.choice([-5, 5])
@@ -301,7 +420,11 @@ class WrathGhost(BaseGhost):
             self.rect.y = int(self.pos[1])
             return 
 
-        self.move_towards(player.rect, speed_mod)
+        # Get status modifiers
+        mods = self.update_status_effects()
+        
+        # Move with both wrath speed and status modifiers
+        self.move_towards(player.rect, speed_mod * mods["speed"])
 
 # ==========================================
 # 7. SLOTH (The Lazy Curse)
@@ -310,31 +433,28 @@ class SlothGhost(BaseGhost):
     def __init__(self, x, y):
         super().__init__(x, y, "Sloth", (0, 255, 255), "ghost_sloth.png")
         self.wake_range = 200 
-        self.curse_cooldown = 0 # Timer to prevent constant cursing
+        self.curse_cooldown = 0
 
     def update(self, player, all_ghosts):
         if not self.check_status(): return
 
         dist = self.get_distance(player)
         
-        # 1. Sleep if out of range
+        # Sleep if out of range
         if dist > self.wake_range:
             return 
             
-        # 2. Curse Logic (When in range)
+        # Curse Logic
         if self.curse_cooldown > 0:
             self.curse_cooldown -= 1
         else:
-            # Trigger Curse!
-            self.curse_cooldown = 400 # Cooldown ~6.5 seconds
+            self.curse_cooldown = 400
             
-            # A. Curse Player (We set a flag on the player object)
-            # 5 seconds * 60 fps = 300 frames
+            # Curse Player
             player.sloth_penalty_timer = 300 
             print("Sloth Cursed the Player! (0.25x Speed)")
             
-            # B. Curse 2 Random Ghosts
-            # Filter valid targets (Not Self, Not Pride)
+            # Curse 2 Random Ghosts
             valid_targets = [g for g in all_ghosts if g != self and g.name != "Pride"]
             
             if len(valid_targets) >= 2:
@@ -344,9 +464,10 @@ class SlothGhost(BaseGhost):
                     print(f"Sloth Cursed {v.name}! (0.25x Speed)")
             elif len(valid_targets) == 1:
                 valid_targets[0].speed_penalty_timer = 300
+                print(f"Sloth Cursed {valid_targets[0].name}!")
 
-        # 3. Move towards player (Normal Speed)
-        self.move_towards(player.rect)
+        # Use AI with status effects
+        self.update_with_ai(player, all_ghosts)
 
 # ==========================================
 # FACTORY

@@ -1,0 +1,55 @@
+{
+  "player": {
+    "points": 0,
+    "highest_level": 1,
+    "deaths": 25,
+    "wins": 0,
+    "playtime_seconds": 767
+  },
+  "inventory": {
+    "owned_items": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "used_items": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "abilities": {
+    "selected": [
+      "Dragon Heart",
+      "Wolf Vein"
+    ],
+    "usage_stats": {
+      "Wolf Vein": 4,
+      "Dragon Heart": 7,
+      "Demon Eye": 0,
+      "Angels Halo": 0,
+      "John Snow": 11
+    }
+  },
+  "statistics": {
+    "coins_collected": 94,
+    "ghosts_killed": 0,
+    "items_collected": 11
+  },
+  "settings": {
+    "audio": {
+      "music": 0.66,
+      "sfx": 0.02
+    },
+    "keybinds": {
+      "ability_1": 49,
+      "ability_2": 50,
+      "shop_1": 113,
+      "shop_2": 101
+    }
+  }
+}
