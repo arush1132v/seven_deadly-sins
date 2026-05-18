@@ -4,7 +4,6 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![Pygame](https://img.shields.io/badge/Pygame-2.0+-00A67E.svg?style=flat&logo=pygame&logoColor=white)](https://www.pygame.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg?style=flat)](https://github.com/YourUsername/SevenDeadlySinsPacman)
 
 <p align="center">
