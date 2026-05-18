@@ -6,9 +6,6 @@
 [![Pygame](https://img.shields.io/badge/Pygame-2.0+-00A67E.svg?style=flat&logo=pygame&logoColor=white)](https://www.pygame.org)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg?style=flat)](https://github.com/YourUsername/SevenDeadlySinsPacman)
 
-<p align="center">
-  <img src="https://via.placeholder.com/800x300/1a1a2e/ffffff?text=Seven+Deadly+Sins+Pac-Man" alt="Game Banner"/>
-</p>
 
 <p align="center">
   <strong>A sophisticated reimagining of the arcade classic, featuring advanced AI, dynamic environments, and strategic gameplay mechanics.</strong>
