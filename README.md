@@ -1204,7 +1204,7 @@ Contributions are welcome! Here's how you can help:
 - Audio may not play on some Linux distributions
 - Ghost pathfinding can get stuck in rare maze configurations
 
-Report issues at: [GitHub Issues]()
+Report issues at: (https://github.com/arush1132v/seven_deadly-sins)
 
 ### Created By
 **Arush Katiyar**
@@ -1235,14 +1235,6 @@ If you enjoyed this game, check out:
 
 ---
 
-## 💬 Community
-
-Join our community:
-- **Discord:** [Link to Discord server]
-- **Reddit:** r/SevenDeadlySinsPacman
-- **Twitter:** [@YourGameHandle]
-
----
 
 <div align="center">
 
